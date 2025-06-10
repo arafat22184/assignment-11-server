@@ -1,11 +1,13 @@
 const express = require("express");
 const { MongoClient, ServerApiVersion } = require("mongodb");
 const app = express();
+const cors = require("cors");
 const port = process.env.PORT || 3000;
 require("dotenv").config();
 
 // Middleware
 app.use(express.json());
+app.use(cors());
 
 // MONGODB
 
@@ -26,8 +28,16 @@ async function run() {
     const blogsCollection = blogify.collection("blogs");
 
     // CRUD
+
+    // All Blogs
     app.get("/blogs", async (req, res) => {
       const result = await blogsCollection.find().toArray();
+      res.send(result);
+    });
+
+    // Six Blog
+    app.get("/recentBlogs", async (req, res) => {
+      const result = await blogsCollection.find().limit(6).toArray();
       res.send(result);
     });
 
