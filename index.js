@@ -29,7 +29,6 @@ async function run() {
       await blogsCollection.createIndex({
         title: "text",
       });
-      console.log("Text index created successfully");
     } catch (e) {
       console.log("Search index creation failed:", e.message);
     }
@@ -37,8 +36,9 @@ async function run() {
     // Improved search endpoint
     app.get("/blogs", async (req, res) => {
       try {
-        const searchText = req.query.search?.trim();
+        const searchText = req.query?.search?.trim();
 
+        // Not Search Text Send All Blogs
         if (!searchText) {
           const result = await blogsCollection.find().toArray();
           return res.json(result);
@@ -68,11 +68,11 @@ async function run() {
         return res.json(result);
       } catch (error) {
         console.error("Search error:", error);
-        res.status(500).json({ error: "Database error" });
+        res.status(500).json({ error: "Blogs Database error" });
       }
     });
 
-    // Recent blogs endpoint
+    // Recent blogs
     app.get("/recentBlogs", async (req, res) => {
       try {
         const result = await blogsCollection
