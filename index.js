@@ -23,7 +23,7 @@ async function run() {
     await client.connect();
     const blogify = client.db("blogify");
     const blogsCollection = blogify.collection("blogs");
-    const wishllistsCollection = blogify.collection("wishlists");
+    const wishlistsCollection = blogify.collection("wishlists");
 
     // Create text index
     try {
@@ -73,12 +73,48 @@ async function run() {
       }
     });
 
+    app.post("/blogs", async (req, res) => {
+      const blogData = req.body;
+      const result = await blogsCollection.insertOne(blogData);
+      res.send(result);
+    });
+
+    // Specific Blog
     app.get("/blogs/:id", async (req, res) => {
       const id = req.params.id;
-      const query = { _id: id };
+      const query = { _id: new ObjectId(id) };
       const result = await blogsCollection.findOne(query);
 
       res.send(result);
+    });
+
+    // Comment Data on Specific Blog
+    app.patch("/blogs/:id", async (req, res) => {
+      const blogId = req.params.id;
+      const commentData = req.body;
+      const query = { _id: new ObjectId(blogId) };
+
+      try {
+        const result = await blogsCollection.updateOne(query, {
+          $push: { comments: commentData },
+        });
+
+        if (result.modifiedCount > 0) {
+          res
+            .status(200)
+            .send({ message: "Comment added successfully", success: true });
+        } else {
+          res.status(404).send({
+            message: "Blog not found or no changes made",
+            success: false,
+          });
+        }
+      } catch (error) {
+        console.error("Error adding comment:", error);
+        res
+          .status(500)
+          .send({ message: "Internal Server Error", success: false });
+      }
     });
 
     // Recent blogs
@@ -105,12 +141,12 @@ async function run() {
         }
 
         const query = { userId, blogId };
-        const existingWishlist = await wishllistsCollection.findOne(query);
-        const blogQuery = { _id: blogId };
+        const existingWishlist = await wishlistsCollection.findOne(query);
+        const blogQuery = { _id: new ObjectId(blogId) };
 
         if (existingWishlist) {
           // If it exists, remove from wishlist
-          const deleteResult = await wishllistsCollection.deleteOne(query);
+          const deleteResult = await wishlistsCollection.deleteOne(query);
 
           // Remove userId from likes array
           await blogsCollection.updateOne(blogQuery, {
@@ -124,7 +160,7 @@ async function run() {
           });
         } else {
           // If it doesn't exist, add to wishlist
-          const insertResult = await wishllistsCollection.insertOne({
+          const insertResult = await wishlistsCollection.insertOne({
             userId,
             blogId,
           });
