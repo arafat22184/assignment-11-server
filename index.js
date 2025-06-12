@@ -106,25 +106,38 @@ async function run() {
 
         const query = { userId, blogId };
         const existingWishlist = await wishllistsCollection.findOne(query);
+        const blogQuery = { _id: blogId };
 
         if (existingWishlist) {
-          // If it exists, remove it
+          // If it exists, remove from wishlist
           const deleteResult = await wishllistsCollection.deleteOne(query);
+
+          // Remove userId from likes array
+          await blogsCollection.updateOne(blogQuery, {
+            $pull: { likes: userId },
+          });
+
           return res.send({
             success: true,
             removed: true,
-            message: "Removed from wishlist",
+            message: "Removed from wishlist and blog unliked",
           });
         } else {
-          // If it doesn't exist, add it
+          // If it doesn't exist, add to wishlist
           const insertResult = await wishllistsCollection.insertOne({
             userId,
             blogId,
           });
+
+          // Add userId to likes array only if not already in it
+          await blogsCollection.updateOne(blogQuery, {
+            $addToSet: { likes: userId },
+          });
+
           return res.send({
             success: true,
             added: true,
-            message: "Added to wishlist",
+            message: "Added to wishlist and blog liked",
           });
         }
       } catch (error) {
@@ -133,6 +146,7 @@ async function run() {
       }
     });
 
+    // Check Is DB connected
     await client.db("admin").command({ ping: 1 });
     console.log("Successfully connected to MongoDB!");
   } finally {
