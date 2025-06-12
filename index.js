@@ -1,5 +1,5 @@
 const express = require("express");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const cors = require("cors");
 const port = process.env.PORT || 3000;
@@ -23,6 +23,7 @@ async function run() {
     await client.connect();
     const blogify = client.db("blogify");
     const blogsCollection = blogify.collection("blogs");
+    const wishllistsCollection = blogify.collection("wishlists");
 
     // Create text index
     try {
@@ -72,6 +73,14 @@ async function run() {
       }
     });
 
+    app.get("/blogs/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: id };
+      const result = await blogsCollection.findOne(query);
+
+      res.send(result);
+    });
+
     // Recent blogs
     app.get("/recentBlogs", async (req, res) => {
       try {
@@ -83,6 +92,44 @@ async function run() {
         res.send(result);
       } catch (error) {
         res.status(500).json({ error: "Database error" });
+      }
+    });
+
+    // Wishlist
+    app.post("/wishlists", async (req, res) => {
+      try {
+        const { userId, blogId } = req.body;
+
+        if (!userId || !blogId) {
+          return res.status(400).send({ message: "Missing userId or blogId" });
+        }
+
+        const query = { userId, blogId };
+        const existingWishlist = await wishllistsCollection.findOne(query);
+
+        if (existingWishlist) {
+          // If it exists, remove it
+          const deleteResult = await wishllistsCollection.deleteOne(query);
+          return res.send({
+            success: true,
+            removed: true,
+            message: "Removed from wishlist",
+          });
+        } else {
+          // If it doesn't exist, add it
+          const insertResult = await wishllistsCollection.insertOne({
+            userId,
+            blogId,
+          });
+          return res.send({
+            success: true,
+            added: true,
+            message: "Added to wishlist",
+          });
+        }
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ success: false, message: "Server error" });
       }
     });
 
