@@ -117,6 +117,20 @@ async function run() {
       }
     });
 
+    // Update Blog
+    app.put("/blogs/:id", async (req, res) => {
+      const blogId = req.params.id;
+      const updateBlog = req.body;
+      const query = { _id: new ObjectId(blogId) };
+      const options = { upsert: true };
+
+      const updateDoc = { $set: updateBlog };
+
+      const result = await blogsCollection.updateOne(query, updateDoc, options);
+
+      res.send(result);
+    });
+
     // Recent blogs
     app.get("/recentBlogs", async (req, res) => {
       try {
