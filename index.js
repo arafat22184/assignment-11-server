@@ -198,6 +198,33 @@ async function run() {
       }
     });
 
+    // Get wishlisted blogs for a user
+    app.get("/wishlistedBlogs", async (req, res) => {
+      try {
+        const { userId } = req.query;
+        if (!userId) {
+          return res.status(400).send({ message: "Missing userId" });
+        }
+
+        const wishlistEntries = await wishlistsCollection
+          .find({ userId })
+          .toArray();
+
+        const blogIds = wishlistEntries.map(
+          (item) => new ObjectId(item.blogId)
+        );
+
+        const blogs = await blogsCollection
+          .find({ _id: { $in: blogIds } })
+          .toArray();
+
+        res.send(blogs);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ message: "Server error" });
+      }
+    });
+
     // Check Is DB connected
     await client.db("admin").command({ ping: 1 });
     console.log("Successfully connected to MongoDB!");
