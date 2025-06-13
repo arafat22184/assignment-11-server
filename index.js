@@ -131,6 +131,22 @@ async function run() {
       }
     });
 
+    // Featured Blogs
+    app.get("/featuredBlogs", async (req, res) => {
+      try {
+        const featuredBlogs = await blogsCollection
+          .find()
+          .sort({ wordCount: -1 })
+          .limit(10)
+          .toArray();
+
+        res.send(featuredBlogs);
+      } catch (error) {
+        console.error("Error fetching featured blogs:", error);
+        res.status(500).json({ error: "Failed to fetch featured blogs" });
+      }
+    });
+
     // Wishlist
     app.post("/wishlists", async (req, res) => {
       try {
