@@ -4,10 +4,51 @@ const app = express();
 const cors = require("cors");
 const port = process.env.PORT || 3000;
 require("dotenv").config();
+const admin = require("firebase-admin");
+
+// Init Firebase
+const serviceAccount = require("./firebase-admin-key.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors({ origin: ["http://localhost:5173"] }));
+
+// Verify Firebase access Token
+const verifyFirebaseToken = async (req, res, next) => {
+  const authHeader = req.headers?.authorization || "";
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+
+  const idToken = authHeader.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : null;
+
+  if (!idToken) {
+    return res.status(401).json({ error: "No token provided" });
+  }
+
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    req.decoded = decodedToken;
+    next();
+  } catch (error) {
+    return res.status(403).json({ error: "Unauthorized access" });
+  }
+};
+
+// Verify User Email
+const verifyEmail = async (req, res, next) => {
+  if (req.headers.email !== req.decoded.email) {
+    return res.status(403).send({ message: "Forbidden access" });
+  }
+  next();
+};
 
 // MONGODB
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.ydu4ilk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
@@ -73,49 +114,60 @@ async function run() {
       }
     });
 
-    app.post("/blogs", async (req, res) => {
+    app.post("/blogs", verifyFirebaseToken, verifyEmail, async (req, res) => {
       const blogData = req.body;
       const result = await blogsCollection.insertOne(blogData);
       res.send(result);
     });
 
     // Specific Blog
-    app.get("/blogs/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await blogsCollection.findOne(query);
+    app.get(
+      "/blogs/:id",
+      verifyFirebaseToken,
+      verifyEmail,
+      async (req, res) => {
+        const id = req.params.id;
+        console.log("reques", req.headers);
+        const query = { _id: new ObjectId(id) };
+        const result = await blogsCollection.findOne(query);
 
-      res.send(result);
-    });
+        res.send(result);
+      }
+    );
 
     // Comment Data on Specific Blog
-    app.patch("/blogs/:id", async (req, res) => {
-      const blogId = req.params.id;
-      const commentData = req.body;
-      const query = { _id: new ObjectId(blogId) };
+    app.patch(
+      "/blogs/:id",
+      verifyFirebaseToken,
+      verifyEmail,
+      async (req, res) => {
+        const blogId = req.params.id;
+        const commentData = req.body;
+        const query = { _id: new ObjectId(blogId) };
 
-      try {
-        const result = await blogsCollection.updateOne(query, {
-          $push: { comments: commentData },
-        });
-
-        if (result.modifiedCount > 0) {
-          res
-            .status(200)
-            .send({ message: "Comment added successfully", success: true });
-        } else {
-          res.status(404).send({
-            message: "Blog not found or no changes made",
-            success: false,
+        try {
+          const result = await blogsCollection.updateOne(query, {
+            $push: { comments: commentData },
           });
+
+          if (result.modifiedCount > 0) {
+            res
+              .status(200)
+              .send({ message: "Comment added successfully", success: true });
+          } else {
+            res.status(404).send({
+              message: "Blog not found or no changes made",
+              success: false,
+            });
+          }
+        } catch (error) {
+          console.error("Error adding comment:", error);
+          res
+            .status(500)
+            .send({ message: "Internal Server Error", success: false });
         }
-      } catch (error) {
-        console.error("Error adding comment:", error);
-        res
-          .status(500)
-          .send({ message: "Internal Server Error", success: false });
       }
-    });
+    );
 
     // Update Blog
     app.put("/blogs/:id", async (req, res) => {
