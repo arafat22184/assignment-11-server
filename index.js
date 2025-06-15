@@ -7,7 +7,11 @@ require("dotenv").config();
 const admin = require("firebase-admin");
 
 // Init Firebase
-const serviceAccount = require("./firebase-admin-key.json");
+
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
+  "utf-8"
+);
+const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
@@ -15,7 +19,7 @@ admin.initializeApp({
 
 // Middleware
 app.use(express.json());
-app.use(cors({ origin: ["http://localhost:5173"] }));
+app.use(cors());
 
 // Verify Firebase access Token
 const verifyFirebaseToken = async (req, res, next) => {
@@ -61,7 +65,7 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+    // await client.connect();
     const blogify = client.db("blogify");
     const blogsCollection = blogify.collection("blogs");
     const wishlistsCollection = blogify.collection("wishlists");
