@@ -60,6 +60,8 @@ const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
+    strict: true,
+    deprecationErrors: true,
   },
 });
 
@@ -70,15 +72,6 @@ async function run() {
     const blogsCollection = blogify.collection("blogs");
     const wishlistsCollection = blogify.collection("wishlists");
     const commentsCollection = blogify.collection("comments");
-
-    // Create text index
-    try {
-      await blogsCollection.createIndex({
-        title: "text",
-      });
-    } catch (e) {
-      console.log("Search index creation failed:", e.message);
-    }
 
     // Improved search endpoint
     app.get("/blogs", async (req, res) => {
@@ -111,7 +104,7 @@ async function run() {
             })
             .toArray();
         }
-
+        console.log("result", result);
         return res.json(result);
       } catch (error) {
         res.status(500).json({ error: "Blogs Database error" });
@@ -336,10 +329,6 @@ async function run() {
         }
       }
     );
-
-    // Check Is DB connected
-    await client.db("admin").command({ ping: 1 });
-    console.log("Successfully connected to MongoDB!");
   } finally {
     // Client will remain connected
   }
