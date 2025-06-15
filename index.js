@@ -109,7 +109,6 @@ async function run() {
 
         return res.json(result);
       } catch (error) {
-        console.error("Search error:", error);
         res.status(500).json({ error: "Blogs Database error" });
       }
     });
@@ -214,82 +213,94 @@ async function run() {
     });
 
     // Wishlist
-    app.post("/wishlists", async (req, res) => {
-      try {
-        const { userId, blogId } = req.body;
+    app.post(
+      "/wishlists",
+      verifyFirebaseToken,
+      verifyEmail,
+      async (req, res) => {
+        try {
+          const { userId, blogId } = req.body;
 
-        if (!userId || !blogId) {
-          return res.status(400).send({ message: "Missing userId or blogId" });
+          if (!userId || !blogId) {
+            return res
+              .status(400)
+              .send({ message: "Missing userId or blogId" });
+          }
+
+          const query = { userId, blogId };
+          const existingWishlist = await wishlistsCollection.findOne(query);
+          const blogQuery = { _id: new ObjectId(blogId) };
+
+          if (existingWishlist) {
+            // If it exists, remove from wishlist
+            const deleteResult = await wishlistsCollection.deleteOne(query);
+
+            // Remove userId from likes array
+            await blogsCollection.updateOne(blogQuery, {
+              $pull: { likes: userId },
+            });
+
+            return res.send({
+              success: true,
+              removed: true,
+              message: "Removed from wishlist and blog unliked",
+            });
+          } else {
+            // If it doesn't exist, add to wishlist
+            const insertResult = await wishlistsCollection.insertOne({
+              userId,
+              blogId,
+            });
+
+            // Add userId to likes array only if not already in it
+            await blogsCollection.updateOne(blogQuery, {
+              $addToSet: { likes: userId },
+            });
+
+            return res.send({
+              success: true,
+              added: true,
+              message: "Added to wishlist and blog liked",
+            });
+          }
+        } catch (error) {
+          console.error(error);
+          res.status(500).send({ success: false, message: "Server error" });
         }
-
-        const query = { userId, blogId };
-        const existingWishlist = await wishlistsCollection.findOne(query);
-        const blogQuery = { _id: new ObjectId(blogId) };
-
-        if (existingWishlist) {
-          // If it exists, remove from wishlist
-          const deleteResult = await wishlistsCollection.deleteOne(query);
-
-          // Remove userId from likes array
-          await blogsCollection.updateOne(blogQuery, {
-            $pull: { likes: userId },
-          });
-
-          return res.send({
-            success: true,
-            removed: true,
-            message: "Removed from wishlist and blog unliked",
-          });
-        } else {
-          // If it doesn't exist, add to wishlist
-          const insertResult = await wishlistsCollection.insertOne({
-            userId,
-            blogId,
-          });
-
-          // Add userId to likes array only if not already in it
-          await blogsCollection.updateOne(blogQuery, {
-            $addToSet: { likes: userId },
-          });
-
-          return res.send({
-            success: true,
-            added: true,
-            message: "Added to wishlist and blog liked",
-          });
-        }
-      } catch (error) {
-        console.error(error);
-        res.status(500).send({ success: false, message: "Server error" });
       }
-    });
+    );
 
     // Get wishlisted blogs for a user
-    app.get("/wishlistedBlogs", async (req, res) => {
-      try {
-        const { userId } = req.query;
-        if (!userId) {
-          return res.status(400).send({ message: "Missing userId" });
+    app.get(
+      "/wishlistedBlogs",
+      verifyFirebaseToken,
+      verifyEmail,
+      async (req, res) => {
+        try {
+          const { userId } = req.query;
+          if (!userId) {
+            return res.status(400).send({ message: "Missing userId" });
+          }
+
+          const wishlistEntries = await wishlistsCollection
+            .find({ userId })
+            .toArray();
+
+          const blogIds = wishlistEntries.map(
+            (item) => new ObjectId(item.blogId)
+          );
+
+          const blogs = await blogsCollection
+            .find({ _id: { $in: blogIds } })
+            .toArray();
+
+          res.send(blogs);
+        } catch (error) {
+          console.error(error);
+          res.status(500).send({ message: "Server error" });
         }
-
-        const wishlistEntries = await wishlistsCollection
-          .find({ userId })
-          .toArray();
-
-        const blogIds = wishlistEntries.map(
-          (item) => new ObjectId(item.blogId)
-        );
-
-        const blogs = await blogsCollection
-          .find({ _id: { $in: blogIds } })
-          .toArray();
-
-        res.send(blogs);
-      } catch (error) {
-        console.error(error);
-        res.status(500).send({ message: "Server error" });
       }
-    });
+    );
 
     // Check Is DB connected
     await client.db("admin").command({ ping: 1 });
