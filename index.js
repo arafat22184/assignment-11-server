@@ -65,6 +65,7 @@ async function run() {
     const blogify = client.db("blogify");
     const blogsCollection = blogify.collection("blogs");
     const wishlistsCollection = blogify.collection("wishlists");
+    const commentsCollection = blogify.collection("comments");
 
     // Create text index
     try {
@@ -126,7 +127,6 @@ async function run() {
       verifyEmail,
       async (req, res) => {
         const id = req.params.id;
-        console.log("reques", req.headers);
         const query = { _id: new ObjectId(id) };
         const result = await blogsCollection.findOne(query);
 
@@ -134,53 +134,87 @@ async function run() {
       }
     );
 
-    // Comment Data on Specific Blog
-    app.patch(
-      "/blogs/:id",
+    // For Comment Seperate Collection
+    app.get("/comments/:blogId", async (req, res) => {
+      try {
+        const blogId = req.params.blogId;
+
+        if (!ObjectId.isValid(blogId)) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid blog ID" });
+        }
+
+        const comments = await commentsCollection
+          .find({
+            blogId: new ObjectId(blogId),
+          })
+          .sort({ postedAt: -1 })
+          .toArray();
+
+        res.status(200).json({ success: true, data: comments });
+      } catch (error) {
+        res.status(500).json({ success: false, message: "Server error" });
+      }
+    });
+
+    // Post Comment
+    app.post(
+      "/comments",
       verifyFirebaseToken,
       verifyEmail,
       async (req, res) => {
-        const blogId = req.params.id;
-        const commentData = req.body;
-        const query = { _id: new ObjectId(blogId) };
-
         try {
-          const result = await blogsCollection.updateOne(query, {
-            $push: { comments: commentData },
-          });
+          const { blogId, text, userImage, userName } = req.body;
 
-          if (result.modifiedCount > 0) {
-            res
-              .status(200)
-              .send({ message: "Comment added successfully", success: true });
-          } else {
-            res.status(404).send({
-              message: "Blog not found or no changes made",
-              success: false,
-            });
+          // Data Validation
+          if (!blogId || !text || !userName) {
+            return res
+              .status(400)
+              .json({ success: false, message: "Missing required fields" });
           }
-        } catch (error) {
-          console.error("Error adding comment:", error);
+
+          const comment = {
+            blogId: new ObjectId(blogId),
+            text,
+            userImage: userImage || null,
+            userName,
+            postedAt: new Date(),
+          };
+
+          const result = await commentsCollection.insertOne(comment);
+
           res
-            .status(500)
-            .send({ message: "Internal Server Error", success: false });
+            .status(201)
+            .json({ success: true, message: "Comment posted", comment });
+        } catch (error) {
+          res.status(500).json({ success: false, message: "Server error" });
         }
       }
     );
 
     // Update Blog
-    app.put("/blogs/:id", async (req, res) => {
-      const blogId = req.params.id;
-      const updateBlog = req.body;
-      const query = { _id: new ObjectId(blogId) };
-      const options = { upsert: true };
+    app.put(
+      "/blogs/:id",
+      verifyFirebaseToken,
+      verifyEmail,
+      async (req, res) => {
+        const blogId = req.params.id;
+        const updateBlog = req.body;
+        const query = { _id: new ObjectId(blogId) };
+        const options = { upsert: true };
 
-      const updateDoc = { $set: updateBlog };
+        const updateDoc = { $set: updateBlog };
 
-      const result = await blogsCollection.updateOne(query, updateDoc, options);
+        const result = await blogsCollection.updateOne(
+          query,
+          updateDoc,
+          options
+        );
 
-      res.send(result);
-    });
+        res.send(result);
+      }
+    );
 
     // Recent blogs
     app.get("/recentBlogs", async (req, res) => {
@@ -207,7 +241,6 @@ async function run() {
 
         res.send(featuredBlogs);
       } catch (error) {
-        console.error("Error fetching featured blogs:", error);
         res.status(500).json({ error: "Failed to fetch featured blogs" });
       }
     });
@@ -264,7 +297,6 @@ async function run() {
             });
           }
         } catch (error) {
-          console.error(error);
           res.status(500).send({ success: false, message: "Server error" });
         }
       }
@@ -296,7 +328,6 @@ async function run() {
 
           res.send(blogs);
         } catch (error) {
-          console.error(error);
           res.status(500).send({ message: "Server error" });
         }
       }
