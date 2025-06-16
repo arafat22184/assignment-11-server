@@ -7,7 +7,6 @@ require("dotenv").config();
 const admin = require("firebase-admin");
 
 // Init Firebase
-
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
   "utf-8"
 );
@@ -78,35 +77,22 @@ async function run() {
       try {
         const searchText = req.query?.search?.trim();
 
-        // Not Search Text Send All Blogs
+        // No search text: return all blogs
         if (!searchText) {
           const result = await blogsCollection.find().toArray();
           return res.json(result);
         }
 
-        // Try text search first
-        let result = await blogsCollection
-          .find({ $text: { $search: searchText } })
-          .project({ score: { $meta: "textScore" } })
-          .sort({ score: { $meta: "textScore" } })
+        // Case-insensitive regex search only on title
+        const regex = new RegExp(searchText, "i");
+
+        const result = await blogsCollection
+          .find({ title: { $regex: regex } })
           .toArray();
 
-        // If text search returns empty or we're searching for a small word (likely a stop word)
-        if (result.length === 0 || searchText.length <= 3) {
-          const regex = new RegExp(searchText, "i");
-          result = await blogsCollection
-            .find({
-              $or: [
-                { title: regex },
-                { shortDescription: regex },
-                { tags: regex },
-              ],
-            })
-            .toArray();
-        }
-        console.log("result", result);
         return res.json(result);
       } catch (error) {
+        console.error("Error searching blogs:", error.message);
         res.status(500).json({ error: "Blogs Database error" });
       }
     });
