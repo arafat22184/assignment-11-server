@@ -242,30 +242,118 @@ async function run() {
       }
     );
 
-    // Update Blog
+    function extractPublicId(url) {
+      if (!url) return null;
+
+      const matches = url.match(/upload\/(?:v\d+\/)?([^\.]+)/);
+      return matches ? matches[1] : null;
+    }
+
+    // Blog Update
     app.put(
       "/blogs/:id",
       verifyFirebaseToken,
       verifyEmail,
+      upload.single("imageFile"),
       async (req, res) => {
-        const blogId = req.params.id;
-        const updateBlog = req.body;
-        const query = { _id: new ObjectId(blogId) };
-        const options = { upsert: true };
+        try {
+          const blogId = req.params.id;
+          const query = { _id: new ObjectId(blogId) };
 
-        const updateDoc = { $set: updateBlog };
+          // First get the existing blog to access the old image
+          const existingBlog = await blogsCollection.findOne(query);
+          if (!existingBlog) {
+            return res.status(404).json({ error: "Blog not found" });
+          }
 
-        const result = await blogsCollection.updateOne(
-          query,
-          updateDoc,
-          options
-        );
+          const {
+            title,
+            category,
+            content,
+            tags,
+            shortDescription,
+            wordCount,
+            imageUrl,
+            authorName,
+            authorEmail,
+            authorPhoto,
+          } = req.body;
 
-        res.send(result);
+          let finalImageUrl = imageUrl;
+
+          // If a new image file is uploaded
+          if (req.file) {
+            // First delete the old image if it exists and is from Cloudinary
+            if (existingBlog.image) {
+              try {
+                const publicId = extractPublicId(existingBlog.image);
+                if (publicId) {
+                  await cloudinary.uploader.destroy(publicId);
+                }
+              } catch (err) {
+                console.error("Error deleting old image:", err);
+                // Don't fail the operation if deletion fails
+              }
+            }
+
+            // Upload the new image
+            const streamUpload = () =>
+              new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                  {
+                    folder: "blog_images",
+                  },
+                  (error, result) => {
+                    if (result) resolve(result);
+                    else reject(error);
+                  }
+                );
+                streamifier.createReadStream(req.file.buffer).pipe(stream);
+              });
+
+            const result = await streamUpload();
+            finalImageUrl = result.secure_url;
+          } else if (imageUrl && imageUrl !== existingBlog.image) {
+            // If image URL changed and no file uploaded, delete old Cloudinary image
+            if (existingBlog.image) {
+              try {
+                const publicId = extractPublicId(existingBlog.image);
+                if (publicId) {
+                  await cloudinary.uploader.destroy(publicId);
+                }
+              } catch (err) {
+                console.error("Error deleting old image:", err);
+              }
+            }
+          }
+
+          const updateDoc = {
+            $set: {
+              title,
+              category,
+              content,
+              tags: JSON.parse(tags),
+              shortDescription,
+              wordCount: Number(wordCount),
+              image: finalImageUrl,
+              author: {
+                name: authorName,
+                email: authorEmail,
+                photo: authorPhoto,
+              },
+              updatedAt: new Date(),
+            },
+          };
+
+          const result = await blogsCollection.updateOne(query, updateDoc);
+          res.send(result);
+        } catch (err) {
+          console.error("Blog update failed:", err);
+          res.status(500).json({ error: "Failed to update blog." });
+        }
       }
     );
 
-    // Recent blogs
     app.get("/recentBlogs", async (req, res) => {
       try {
         const result = await blogsCollection
