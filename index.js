@@ -71,7 +71,6 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    // await client.connect();
     const blogify = client.db("blogify");
     const blogsCollection = blogify.collection("blogs");
     const wishlistsCollection = blogify.collection("wishlists");
@@ -97,7 +96,6 @@ async function run() {
 
         return res.json(result);
       } catch (error) {
-        console.error("Error searching blogs:", error.message);
         res.status(500).json({ error: "Blogs Database error" });
       }
     });
@@ -163,7 +161,6 @@ async function run() {
           const result = await blogsCollection.insertOne(blogData);
           res.send(result);
         } catch (err) {
-          console.error(err);
           res.status(500).json({ error: "Blog upload failed." });
         }
       }
@@ -292,7 +289,6 @@ async function run() {
                 }
               } catch (err) {
                 console.error("Error deleting old image:", err);
-                // Don't fail the operation if deletion fails
               }
             }
 
@@ -347,7 +343,6 @@ async function run() {
           const result = await blogsCollection.updateOne(query, updateDoc);
           res.send(result);
         } catch (err) {
-          console.error("Blog update failed:", err);
           res.status(500).json({ error: "Failed to update blog." });
         }
       }
