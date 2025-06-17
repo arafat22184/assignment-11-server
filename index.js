@@ -5,6 +5,11 @@ const cors = require("cors");
 const port = process.env.PORT || 3000;
 require("dotenv").config();
 const admin = require("firebase-admin");
+// Cloudinary
+const multer = require("multer");
+const upload = multer({ storage: multer.memoryStorage() });
+const { cloudinary } = require("./cloudinary");
+const streamifier = require("streamifier");
 
 // Init Firebase
 const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
@@ -97,11 +102,72 @@ async function run() {
       }
     });
 
-    app.post("/blogs", verifyFirebaseToken, verifyEmail, async (req, res) => {
-      const blogData = req.body;
-      const result = await blogsCollection.insertOne(blogData);
-      res.send(result);
-    });
+    app.post(
+      "/blogs",
+      verifyFirebaseToken,
+      verifyEmail,
+      upload.single("imageFile"),
+      async (req, res) => {
+        try {
+          const {
+            title,
+            category,
+            content,
+            tags,
+            shortDescription,
+            wordCount,
+            imageUrl,
+            authorName,
+            authorEmail,
+            authorPhoto,
+          } = req.body;
+
+          let finalImageUrl = imageUrl;
+
+          if (req.file) {
+            const streamUpload = () =>
+              new Promise((resolve, reject) => {
+                const stream = cloudinary.uploader.upload_stream(
+                  {
+                    folder: "blog_images",
+                  },
+                  (error, result) => {
+                    if (result) resolve(result);
+                    else reject(error);
+                  }
+                );
+                streamifier.createReadStream(req.file.buffer).pipe(stream);
+              });
+
+            const result = await streamUpload();
+            finalImageUrl = result.secure_url;
+          }
+
+          const blogData = {
+            title,
+            category,
+            content,
+            tags: JSON.parse(tags),
+            shortDescription,
+            wordCount: Number(wordCount),
+            image: finalImageUrl,
+            createdAt: new Date(),
+            author: {
+              name: authorName,
+              email: authorEmail,
+              photo: authorPhoto,
+            },
+            likes: [],
+          };
+
+          const result = await blogsCollection.insertOne(blogData);
+          res.send(result);
+        } catch (err) {
+          console.error(err);
+          res.status(500).json({ error: "Blog upload failed." });
+        }
+      }
+    );
 
     // Specific Blog
     app.get(
