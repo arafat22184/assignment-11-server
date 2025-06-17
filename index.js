@@ -341,7 +341,6 @@ async function run() {
                 email: authorEmail,
                 photo: authorPhoto,
               },
-              updatedAt: new Date(),
             },
           };
 
