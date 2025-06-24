@@ -62,19 +62,12 @@ npm install
 ### 4. Create a `.env` File
 
 ```env
-PORT=5000
-MONGODB_URI=your_mongodb_connection_string
-ACCESS_TOKEN_SECRET=your_jwt_secret
-FIREBASE_TYPE=your_firebase_type
-FIREBASE_PROJECT_ID=your_project_id
-FIREBASE_PRIVATE_KEY_ID=your_private_key_id
-FIREBASE_PRIVATE_KEY=your_private_key
-FIREBASE_CLIENT_EMAIL=your_client_email
-FIREBASE_CLIENT_ID=your_client_id
-FIREBASE_AUTH_URI=your_auth_uri
-FIREBASE_TOKEN_URI=your_token_uri
-FIREBASE_AUTH_PROVIDER_X509_CERT_URL=your_cert_url
-FIREBASE_CLIENT_X509_CERT_URL=your_cert_url
+DB_USER=your_mongodb_user
+DB_PASS=your_mongodb_pass
+CLOUDINARY_CLOUD_NAME=your_cloudinary_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
+FB_SERVICE_KEY=your_firebase_key
 ```
 
 ### 5. Start the Server
@@ -115,9 +108,11 @@ assignment-11-server/
 ├── index.js
 ├── package.json
 ├── package-lock.json
-├── /routes
-├── /controllers
-├── /models
+├── README.md
+├── addWordCount.js
+├── cloudinary.js
+├── addWordCount.js
+├── vercel.json
 ```
 
 ---
