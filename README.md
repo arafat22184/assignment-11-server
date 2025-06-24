@@ -77,7 +77,7 @@ npm start
 ```
 
 Your server should now be running at:  
-➡️ `http://localhost:5000`
+➡️ `http://localhost:3000`
 
 ---
 
