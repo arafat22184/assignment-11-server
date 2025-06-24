@@ -83,19 +83,36 @@ Your server should now be running at:
 
 ## 📌 Example API Endpoints
 
-| Method | Endpoint            | Description                             |
-|--------|---------------------|-----------------------------------------|
-| GET    | /blogs              | Get all blogs                           |
-| GET    | /blogs/:id          | Get blog details by ID                  |
-| POST   | /blogs              | Create a new blog                       |
-| PUT    | /blogs/:id          | Update blog (only by blog owner)        |
-| DELETE | /blogs/:id          | Delete blog (only by blog owner)        |
-| GET    | /wishlist/:email    | Get wishlist by user email              |
-| POST   | /wishlist           | Add blog to wishlist                    |
-| DELETE | /wishlist/:id       | Remove blog from wishlist               |
-| POST   | /comments           | Post a comment on a blog                |
-| GET    | /comments/:blogId   | Get all comments for a blog             |
-| POST   | /jwt                | Generate a JWT access token             |
+### 📝 Blog Routes
+
+| Method | Endpoint          | Description                                                            |
+|--------|-------------------|------------------------------------------------------------------------|
+| GET    | /blogs            | Get all blogs or search blogs by title (supports `?search=...`)       |
+| GET    | /blogs/:id        | Get blog details by ID (requires auth)                                 |
+| POST   | /blogs            | Create a new blog with image upload (requires auth)                    |
+| PUT    | /blogs/:id        | Update blog with optional image change (requires auth & ownership)     |
+
+### 💬 Comment Routes
+
+| Method | Endpoint            | Description                                     |
+|--------|---------------------|-------------------------------------------------|
+| GET    | /comments/:blogId   | Get all comments for a blog                     |
+| POST   | /comments           | Post a comment on a blog (requires auth)        |
+
+### ⭐ Wishlist Routes
+
+| Method | Endpoint            | Description                                                     |
+|--------|---------------------|-----------------------------------------------------------------|
+| POST   | /wishlists          | Toggle wishlist status for a blog (requires auth)              |
+| GET    | /wishlistedBlogs    | Get all wishlisted blogs by `userId` (requires auth)           |
+
+### 🔥 Featured & Recent Blogs
+
+| Method | Endpoint            | Description                          |
+|--------|---------------------|--------------------------------------|
+| GET    | /recentBlogs        | Get latest 6 blogs                   |
+| GET    | /featuredBlogs      | Get top 10 featured blogs by length  |
+"""
 
 ---
 
