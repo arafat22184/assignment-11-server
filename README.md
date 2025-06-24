@@ -112,7 +112,6 @@ Your server should now be running at:
 |--------|---------------------|--------------------------------------|
 | GET    | /recentBlogs        | Get latest 6 blogs                   |
 | GET    | /featuredBlogs      | Get top 10 featured blogs by length  |
-"""
 
 ---
 
