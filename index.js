@@ -353,7 +353,7 @@ async function run() {
         const result = await blogsCollection
           .find()
           .sort({ createdAt: -1 })
-          .limit(6)
+          .limit(8)
           .toArray();
         res.send(result);
       } catch (error) {
