@@ -348,6 +348,7 @@ async function run() {
       }
     );
 
+    // Get Recent Blogs
     app.get("/recentBlogs", async (req, res) => {
       try {
         const result = await blogsCollection
@@ -463,6 +464,43 @@ async function run() {
         }
       }
     );
+
+    // Delete Blog
+    app.delete("/blogs/:blogId", async (req, res) => {
+      try {
+        const blogId = req.params.blogId;
+
+        // Validate ObjectId
+        if (!ObjectId.isValid(blogId)) {
+          return res
+            .status(400)
+            .json({ success: false, message: "Invalid blog ID" });
+        }
+
+        // Delete the blog
+        const deleteResult = await blogsCollection.deleteOne({
+          _id: new ObjectId(blogId),
+        });
+
+        if (deleteResult.deletedCount === 0) {
+          return res
+            .status(404)
+            .json({ success: false, message: "Blog not found" });
+        }
+
+        // Delete all related comments for this blog
+        await commentsCollection.deleteMany({
+          blogId: new ObjectId(blogId),
+        });
+
+        res.status(200).json({
+          success: true,
+          message: "Blog and related comments deleted",
+        });
+      } catch (error) {
+        res.status(500).json({ success: false, message: "Server error" });
+      }
+    });
   } finally {
     // Client will remain connected
   }
