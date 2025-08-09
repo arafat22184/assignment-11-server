@@ -100,6 +100,24 @@ async function run() {
       }
     });
 
+    app.get("/myBlogs", async (req, res) => {
+      try {
+        const userEmail = req.query?.email;
+
+        if (!userEmail) {
+          res.status(401).json({ error: "Unauthorized access" });
+        }
+
+        const result = await blogsCollection
+          .find({ "author.email": userEmail })
+          .toArray();
+
+        return res.json(result);
+      } catch (error) {
+        res.status(500).json({ error: "Blogs Database error" });
+      }
+    });
+
     app.post(
       "/blogs",
       verifyFirebaseToken,
@@ -156,6 +174,7 @@ async function run() {
               photo: authorPhoto,
             },
             likes: [],
+            comments: [],
           };
 
           const result = await blogsCollection.insertOne(blogData);
@@ -211,7 +230,8 @@ async function run() {
       verifyEmail,
       async (req, res) => {
         try {
-          const { blogId, text, userImage, userName } = req.body;
+          const { blogId, text, userImage, userName, userId } = req.body;
+          const blogQuery = { _id: new ObjectId(blogId) };
 
           // Data Validation
           if (!blogId || !text || !userName) {
@@ -229,6 +249,11 @@ async function run() {
           };
 
           const result = await commentsCollection.insertOne(comment);
+
+          // Add userId to Comments array only if not already in it
+          await blogsCollection.updateOne(blogQuery, {
+            $addToSet: { comments: userId },
+          });
 
           res
             .status(201)
