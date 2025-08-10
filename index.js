@@ -100,7 +100,7 @@ async function run() {
       }
     });
 
-    app.get("/myBlogs", async (req, res) => {
+    app.get("/myBlogs", verifyFirebaseToken, verifyEmail, async (req, res) => {
       try {
         const userEmail = req.query?.email;
 
@@ -491,39 +491,150 @@ async function run() {
     );
 
     // Delete Blog
-    app.delete("/blogs/:blogId", async (req, res) => {
+    app.delete(
+      "/blogs/:blogId",
+      verifyFirebaseToken,
+      verifyEmail,
+      async (req, res) => {
+        try {
+          const blogId = req.params.blogId;
+
+          // Validate ObjectId
+          if (!ObjectId.isValid(blogId)) {
+            return res
+              .status(400)
+              .json({ success: false, message: "Invalid blog ID" });
+          }
+
+          // Delete the blog
+          const deleteResult = await blogsCollection.deleteOne({
+            _id: new ObjectId(blogId),
+          });
+
+          if (deleteResult.deletedCount === 0) {
+            return res
+              .status(404)
+              .json({ success: false, message: "Blog not found" });
+          }
+
+          // Delete all related comments for this blog
+          await commentsCollection.deleteMany({
+            blogId: new ObjectId(blogId),
+          });
+
+          res.status(200).json({
+            success: true,
+            message: "Blog and related comments deleted",
+          });
+        } catch (error) {
+          res.status(500).json({ success: false, message: "Server error" });
+        }
+      }
+    );
+
+    // User Statistics Endpoint
+    app.get("/userStats", async (req, res) => {
       try {
-        const blogId = req.params.blogId;
+        const email = req.query.email;
 
-        // Validate ObjectId
-        if (!ObjectId.isValid(blogId)) {
-          return res
-            .status(400)
-            .json({ success: false, message: "Invalid blog ID" });
-        }
-
-        // Delete the blog
-        const deleteResult = await blogsCollection.deleteOne({
-          _id: new ObjectId(blogId),
+        // Get total blogs count
+        const totalBlogs = await blogsCollection.countDocuments({
+          "author.email": email,
         });
 
-        if (deleteResult.deletedCount === 0) {
-          return res
-            .status(404)
-            .json({ success: false, message: "Blog not found" });
-        }
+        // Get all blogs by this user to calculate likes and comments
+        const userBlogs = await blogsCollection
+          .find({ "author.email": email })
+          .toArray();
 
-        // Delete all related comments for this blog
-        await commentsCollection.deleteMany({
-          blogId: new ObjectId(blogId),
+        // Calculate total likes (sum of all likes arrays)
+        const totalLikes = userBlogs.reduce(
+          (sum, blog) => sum + (blog.likes?.length || 0),
+          0
+        );
+
+        // Calculate total comments (sum of all comments arrays)
+        const totalComments = userBlogs.reduce(
+          (sum, blog) => sum + (blog.comments?.length || 0),
+          0
+        );
+
+        // Get most popular category
+        const categoryCounts = {};
+        userBlogs.forEach((blog) => {
+          categoryCounts[blog.category] =
+            (categoryCounts[blog.category] || 0) + 1;
         });
 
-        res.status(200).json({
-          success: true,
-          message: "Blog and related comments deleted",
+        const topCategory =
+          Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+          "N/A";
+
+        res.json({
+          totalBlogs,
+          totalLikes,
+          totalComments,
+          topCategory,
         });
       } catch (error) {
-        res.status(500).json({ success: false, message: "Server error" });
+        res.status(500).json({ error: "Failed to get user statistics" });
+      }
+    });
+
+    // Recent Blogs Endpoint
+    app.get(
+      "/dashboardRecentBlogs",
+      verifyFirebaseToken,
+      verifyEmail,
+      async (req, res) => {
+        try {
+          const email = req.query.email;
+
+          const recentBlogs = await blogsCollection
+            .find({ "author.email": email })
+            .sort({ createdAt: -1 })
+            .project({
+              title: 1,
+              image: 1,
+              createdAt: 1,
+              likes: 1,
+              comments: 1,
+              category: 1,
+            })
+            .limit(3)
+            .toArray();
+
+          res.json(recentBlogs);
+        } catch (error) {
+          console.error("Error in /recentBlogs:", error);
+          res.status(500).json({ error: "Failed to get recent blogs" });
+        }
+      }
+    );
+
+    // Popular blogs
+    app.get("/popularBlogs", async (req, res) => {
+      try {
+        const email = req.query.email;
+
+        // First get all blogs for the user
+        const blogs = await blogsCollection
+          .find({ "author.email": email })
+          .toArray();
+
+        // Sort in memory by calculating lengths
+        const sortedBlogs = blogs
+          .sort((a, b) => {
+            const aScore = (a.likes?.length || 0) + (a.comments?.length || 0);
+            const bScore = (b.likes?.length || 0) + (b.comments?.length || 0);
+            return bScore - aScore;
+          })
+          .slice(0, 3);
+
+        res.json(sortedBlogs);
+      } catch (error) {
+        console.error("Error in /popularBlogs:", error);
+        res.status(500).json({ error: "Failed to fetch popular blogs" });
       }
     });
   } finally {

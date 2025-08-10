@@ -29,8 +29,6 @@ async function updateWordCounts() {
         updatedCount++;
       }
     }
-
-    console.log(`✅ wordCount added to ${updatedCount} blog(s).`);
   } catch (err) {
     console.error("Error updating wordCount:", err);
   } finally {
